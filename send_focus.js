@@ -22,11 +22,11 @@ const AUTH_DIR = path.join(__dirname, "baileys_auth_info");
 
 async function connectToWhatsApp() {
   const baileys = await import("@whiskeysockets/baileys");
-  const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason
-  } = baileys;
+  
+  // Handle CommonJS vs ESM default export resolution safely
+  const makeWASocket = baileys.default?.default || baileys.default || baileys.makeWASocket;
+  const useMultiFileAuthState = baileys.useMultiFileAuthState;
+  const DisconnectReason = baileys.DisconnectReason;
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 

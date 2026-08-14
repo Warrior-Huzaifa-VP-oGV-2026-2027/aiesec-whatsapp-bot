@@ -1,150 +1,168 @@
-const { Client, RemoteAuth } = require("whatsapp-web.js");
-const { MongoStore } = require("wwebjs-mongo");
-const mongoose = require("mongoose");
-const cron = require("node-cron");
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion
+} = require("@whiskeysockets/baileys");
 const express = require("express");
+const cron = require("node-cron");
+const qrImage = require("qr-image");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
+let sock = null;
 let latestQrData = null;
+let isConnected = false;
 
+// Enable CORS for dashboard
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   next();
 });
-
 app.use(express.json());
 
-const MONGO_URI = "mongodb+srv://huzaifasuhail_db_user:NUfpDGVCyK8jwMti@cluster0.b0fqrkt.mongodb.net/whatsapp_bot?retryWrites=true&w=majority";
+// Persistent Local Auth Directory
+const AUTH_DIR = path.join(__dirname, "baileys_auth_info");
 
-console.log("⏳ Connecting to MongoDB Session Store...");
+async function connectToWhatsApp() {
+  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  const { version } = await fetchLatestBaileysVersion();
 
-mongoose.connect(MONGO_URI).then(() => {
-  console.log("🍃 Successfully connected to MongoDB Session Store!");
+  console.log(`⚡ Starting Baileys WhatsApp Engine (v${version.join(".")})...`);
 
-  const store = new MongoStore({ mongoose: mongoose });
-
-  const client = new Client({
-    authStrategy: new RemoteAuth({
-      store: store,
-      backupSyncIntervalMs: 300000
-    }),
-    // FIX: Forces WhatsApp Web to use a stable, cached remote version
-    // preventing headless Chrome from freezing during page load.
-    webVersionCache: {
-      type: "remote",
-      remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html"
-    },
-    puppeteer: {
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-accelerated-2d-canvas",
-        "--no-first-run",
-        "--no-zygote",
-        "--disable-gpu",
-        "--unhandled-rejections=strict"
-      ]
-    }
+  sock = makeWASocket({
+    version,
+    auth: state,
+    printQRInTerminal: false,
+    syncFullHistory: false,
+    markOnlineOnConnect: false
   });
 
-  client.on("qr", (qr) => {
-    latestQrData = qr;
-    console.log("⚡ New QR Code generated! View and scan it at /qr");
-  });
+  sock.ev.on("creds.update", saveCreds);
 
-  client.on("authenticated", () => {
-    console.log("🔐 WhatsApp Session Authenticated Successfully!");
-  });
+  sock.ev.on("connection.update", (update) => {
+    const { connection, lastDisconnect, qr } = update;
 
-  client.on("ready", () => {
-    latestQrData = null;
-    console.log("✅ WhatsApp Engine is Fully Connected & Listening for Commands!");
-  });
-
-  client.on("remote_session_saved", () => {
-    console.log("💾 Persistent Session Saved to MongoDB Database!");
-  });
-
-  app.get("/", (req, res) => {
-    res.send('<h2>🤖 AIESEC WhatsApp Bot is running live!</h2><p>Go to <a href="/qr">/qr</a> to scan your WhatsApp QR code.</p>');
-  });
-
-  app.get("/qr", (req, res) => {
-    if (!latestQrData) {
-      return res.send("<h2>✅ WhatsApp is already connected or QR code is generating... check Render logs!</h2>");
-    }
-    const qrImage = require("qr-image");
-    const qrStream = qrImage.image(latestQrData, { type: "png" });
-    res.type("png");
-    qrStream.pipe(res);
-  });
-
-  let config = {
-    time: "09:00",
-    template: `⚔️ *AIESEC Daily Focus List*\nHi {NAME}! Here are your priorities for today:\n\n{TASKS}\n\n*Make it happen!*`,
-    team: []
-  };
-
-  async function executeDispatch() {
-    console.log("🚀 Starting WhatsApp Focus Dispatch...");
-
-    if (!client.info || !client.info.wid) {
-      console.error("❌ Cannot send message: WhatsApp engine is not logged in or ready yet! Please scan the QR code first.");
-      return;
+    if (qr) {
+      latestQrData = qr;
+      console.log("⚡ New QR Code generated! View it at /qr");
     }
 
-    for (const member of config.team) {
-      try {
-        let taskList = member.tasks.map((task, i) => `${i + 1}. 🔸 ${task}`).join("\n");
-        let message = config.template.replace("{NAME}", member.name).replace("{TASKS}", taskList);
+    if (connection === "open") {
+      latestQrData = null;
+      isConnected = true;
+      console.log("✅ Baileys Engine Connected & Ready to Send Messages!");
+    }
 
-        let cleanPhone = member.phone.replace(/[^0-9]/g, "");
-        if (cleanPhone.startsWith("00")) cleanPhone = cleanPhone.substring(2);
+    if (connection === "close") {
+      isConnected = false;
+      const shouldReconnect =
+        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      
+      console.log(
+        "⚠️ Connection closed due to:",
+        lastDisconnect?.error || "Unknown Reason",
+        "Reconnecting:",
+        shouldReconnect
+      );
 
-        let recipientId = cleanPhone + "@c.us";
-        await client.sendMessage(recipientId, message);
-        console.log(`✅ Sent focus list to ${member.name} (${cleanPhone})`);
-      } catch (err) {
-        console.error(`❌ Failed to send to ${member.name}:`, err.message || err);
+      if (shouldReconnect) {
+        setTimeout(connectToWhatsApp, 3000);
+      } else {
+        console.log("❌ Logged out. Clearing session files...");
+        if (fs.existsSync(AUTH_DIR)) {
+          fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        }
+        setTimeout(connectToWhatsApp, 3000);
       }
     }
+  });
+}
+
+// Serve QR Image
+app.get("/qr", (req, res) => {
+  if (isConnected) {
+    return res.send("<h2>✅ WhatsApp is ALREADY connected and active!</h2>");
+  }
+  if (!latestQrData) {
+    return res.send("<h2>⏳ Generating QR code... Refresh in 3 seconds.</h2>");
+  }
+  const qrStream = qrImage.image(latestQrData, { type: "png" });
+  res.type("png");
+  qrStream.pipe(res);
+});
+
+app.get("/", (req, res) => {
+  res.send('<h2>⚡ Light-speed Baileys Engine Running!</h2><p>Check QR at <a href="/qr">/qr</a></p>');
+});
+
+// Default Configuration State
+let config = {
+  time: "09:00",
+  template: `⚔️ *AIESEC Daily Focus List*\nHi {NAME}! Here are your priorities for today:\n\n{TASKS}\n\n*Make it happen!*`,
+  team: []
+};
+
+// Dispatch logic
+async function executeDispatch() {
+  console.log("🚀 Starting WhatsApp Focus Dispatch...");
+
+  if (!sock || !isConnected) {
+    console.error("❌ Cannot send: Baileys WhatsApp client is not connected yet!");
+    return;
   }
 
-  app.post("/api/send-now", (req, res) => {
-    const { template, team } = req.body;
-    if (template) config.template = template;
-    if (team && team.length > 0) config.team = team;
+  for (const member of config.team) {
+    try {
+      let taskList = member.tasks.map((task, i) => `${i + 1}. 🔸 ${task}`).join("\n");
+      let message = config.template.replace("{NAME}", member.name).replace("{TASKS}", taskList);
 
+      let cleanPhone = member.phone.replace(/[^0-9]/g, "");
+      if (cleanPhone.startsWith("00")) cleanPhone = cleanPhone.substring(2);
+
+      let jid = cleanPhone + "@s.whatsapp.net";
+
+      await sock.sendMessage(jid, { text: message });
+      console.log(`✅ Sent focus list to ${member.name} (${cleanPhone})`);
+    } catch (err) {
+      console.error(`❌ Failed to send to ${member.name}:`, err.message || err);
+    }
+  }
+}
+
+// API Endpoints
+app.post("/api/send-now", (req, res) => {
+  const { template, team } = req.body;
+  if (template) config.template = template;
+  if (team && team.length > 0) config.team = team;
+
+  executeDispatch();
+  res.json({ status: "success", message: "Dispatch initiated!" });
+});
+
+let currentCronTask = null;
+app.post("/api/save-config", (req, res) => {
+  const { time, template, team } = req.body;
+  if (time) config.time = time;
+  if (template) config.template = template;
+  if (team && team.length > 0) config.team = team;
+
+  if (currentCronTask) currentCronTask.stop();
+
+  const [hour, minute] = config.time.split(":");
+  currentCronTask = cron.schedule(`${minute} ${hour} * * *`, () => {
+    console.log(`⏰ Executing Scheduled Dispatch at ${config.time}...`);
     executeDispatch();
-    res.json({ status: "success", message: "Dispatch initiated!" });
   });
 
-  let currentCronTask = null;
-  app.post("/api/save-config", (req, res) => {
-    const { time, template, team } = req.body;
-    if (time) config.time = time;
-    if (template) config.template = template;
-    if (team && team.length > 0) config.team = team;
-
-    if (currentCronTask) currentCronTask.stop();
-
-    const [hour, minute] = config.time.split(":");
-    currentCronTask = cron.schedule(`${minute} ${hour} * * *`, () => {
-      console.log(`⏰ Executing Scheduled Daily Dispatch at ${config.time}...`);
-      executeDispatch();
-    });
-
-    console.log(`⏰ Updated Daily Schedule to ${config.time}`);
-    res.json({ status: "success", message: "Schedule updated successfully!" });
-  });
-
-  client.initialize();
-}).catch((err) => {
-  console.error("❌ Failed to connect to MongoDB Atlas:", err.message);
+  console.log(`⏰ Daily Schedule set to ${config.time}`);
+  res.json({ status: "success", message: "Schedule updated!" });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🖥️ Server listening on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🖥️ Server running on port ${PORT}`);
+  connectToWhatsApp();
+});

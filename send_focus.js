@@ -17,26 +17,22 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 
-// Persistent Local Auth Directory
+// Persistent Auth Directory
 const AUTH_DIR = path.join(__dirname, "baileys_auth_info");
 
 async function connectToWhatsApp() {
-  // Dynamic import to support ESM package in CommonJS
   const baileys = await import("@whiskeysockets/baileys");
   const {
     default: makeWASocket,
     useMultiFileAuthState,
-    DisconnectReason,
-    fetchLatestBaileysVersion
+    DisconnectReason
   } = baileys;
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const { version } = await fetchLatestBaileysVersion();
 
-  console.log(`⚡ Starting Baileys WhatsApp Engine (v${version.join(".")})...`);
+  console.log("⚡ Starting Baileys WhatsApp Engine...");
 
   sock = makeWASocket({
-    version,
     auth: state,
     printQRInTerminal: false,
     syncFullHistory: false,
@@ -61,15 +57,10 @@ async function connectToWhatsApp() {
 
     if (connection === "close") {
       isConnected = false;
-      const shouldReconnect =
-        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-      console.log(
-        "⚠️ Connection closed due to:",
-        lastDisconnect?.error || "Unknown Reason",
-        "Reconnecting:",
-        shouldReconnect
-      );
+      console.log(`⚠️ Connection closed (code: ${statusCode}). Reconnecting: ${shouldReconnect}`);
 
       if (shouldReconnect) {
         setTimeout(connectToWhatsApp, 3000);

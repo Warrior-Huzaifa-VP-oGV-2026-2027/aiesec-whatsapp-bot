@@ -85,29 +85,48 @@ let config = {
 };
 
 // Core Sending Function
-function executeDispatch() {
+// Core Sending Function
+async function executeDispatch() {
   console.log("🚀 Starting WhatsApp Focus Dispatch...");
-  config.team.forEach((member) => {
-    let taskList = member.tasks
-      .map((task, i) => `${i + 1}. 🔸 ${task}`)
-      .join("\n");
-    let message = config.template
-      .replace("{NAME}", member.name)
-      .replace("{TASKS}", taskList);
 
-    // Sanitize phone number (strip spaces/plus signs)
-    let cleanPhone = member.phone.replace(/[^0-9]/g, "");
-    let recipientId = cleanPhone + "@c.us";
+  // Check if client is actually connected
+  if (!client.info || !client.info.wid) {
+    console.error("❌ Cannot send message: WhatsApp engine is not logged in or ready yet! Please scan the QR code first.");
+    return;
+  }
 
-    client
-      .sendMessage(recipientId, message)
-      .then(() =>
-        console.log(`✅ Sent focus list to ${member.name} (${cleanPhone})`),
-      )
-      .catch((err) =>
-        console.error(`❌ Failed to send to ${member.name}:`, err),
-      );
-  });
+  for (const member of config.team) {
+    try {
+      let taskList = member.tasks
+        .map((task, i) => `${i + 1}. 🔸 ${task}`)
+        .join("\n");
+
+      let message = config.template
+        .replace("{NAME}", member.name)
+        .replace("{TASKS}", taskList);
+
+      // Clean phone number
+      let cleanPhone = member.phone.replace(/[^0-9]/g, "");
+      if (cleanPhone.startsWith("00")) {
+        cleanPhone = cleanPhone.substring(2);
+      }
+
+      let recipientId = cleanPhone + "@c.us";
+
+      // Verify number existence on WhatsApp
+      const isRegistered = await client.isRegisteredUser(recipientId);
+      if (!isRegistered) {
+        console.error(`❌ Number ${cleanPhone} is not registered on WhatsApp! Check country code.`);
+        continue;
+      }
+
+      // Send message safely
+      await client.sendMessage(recipientId, message);
+      console.log(`✅ Sent focus list to ${member.name} (${cleanPhone})`);
+    } catch (err) {
+      console.error(`❌ Failed to send to ${member.name}:`, err.message);
+    }
+  }
 }
 
 // API Endpoint: Manual Trigger From Admin Button

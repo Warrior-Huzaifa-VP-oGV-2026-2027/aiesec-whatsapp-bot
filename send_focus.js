@@ -5,7 +5,10 @@ const express = require("express");
 
 const app = express();
 
-// Enable CORS so HTML file can talk seamlessly to local port 3000
+// Store latest raw QR code data
+let latestQrData = null;
+
+// Enable CORS so HTML file can talk seamlessly to the server
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -17,32 +20,47 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Initialize WhatsApp Web Client using local macOS Chrome
+// Initialize WhatsApp Web Client for Docker/Cloud Environment
 const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ]
-    }
+  authStrategy: new LocalAuth(),
+  puppeteer: {
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--single-process",
+      "--disable-gpu",
+    ],
+  },
 });
 
 client.on("qr", (qr) => {
+  latestQrData = qr;
   console.log("Scan this QR Code with your WhatsApp (Linked Devices):");
   qrcode.generate(qr, { small: true });
 });
 
 client.on("ready", () => {
+  latestQrData = null; // Clear QR code after successful connection
   console.log(
     "✅ WhatsApp Engine is Connected & Listening for Dashboard Commands!",
   );
+});
+
+// Endpoint to easily render the QR code in your browser at /qr
+app.get("/qr", (req, res) => {
+  if (!latestQrData) {
+    return res.send(
+      "<h2>✅ WhatsApp is already connected or QR code is generating... check logs!</h2>",
+    );
+  }
+  const qrImage = require("qr-image");
+  const qrStream = qrImage.image(latestQrData, { type: "png" });
+  res.type("png");
+  qrStream.pipe(res);
 });
 
 // Default Configuration State
@@ -128,6 +146,8 @@ app.post("/api/save-config", (req, res) => {
 });
 
 client.initialize();
-app.listen(3000, () =>
-  console.log("🖥️ Local Server listening on http://localhost:3000"),
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () =>
+  console.log(`🖥️ Server listening on port ${PORT}`),
 );

@@ -1,14 +1,13 @@
-const { Client, LocalAuth } = require("whatsapp-web.js");
-const qrcode = require("qrcode-terminal");
+const { Client, RemoteAuth } = require("whatsapp-web.js");
+const { MongoStore } = require("wwebjs-mongo");
+const mongoose = require("mongoose");
 const cron = require("node-cron");
 const express = require("express");
 
 const app = express();
-
-// Store latest raw QR code data
 let latestQrData = null;
 
-// Enable CORS so HTML file can talk seamlessly to the server
+// CORS setup for seamless dashboard connection
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -20,153 +19,162 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Initialize WhatsApp Web Client for Docker/Cloud Environment
-const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: {
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-accelerated-2d-canvas",
-      "--no-first-run",
-      "--no-zygote",
-      "--single-process",
-      "--disable-gpu",
-    ],
-  },
-});
+// Your MongoDB Atlas Connection String
+const MONGO_URI =
+  "mongodb+srv://huzaifasuhail_db_user:NUfpDGVCyK8jwMti@cluster0.b0fqrkt.mongodb.net/whatsapp_bot?retryWrites=true&w=majority";
 
-client.on("qr", (qr) => {
-  latestQrData = qr;
-  console.log("Scan this QR Code with your WhatsApp (Linked Devices):");
-  qrcode.generate(qr, { small: true });
-});
+console.log("⏳ Connecting to MongoDB Session Store...");
 
-client.on("ready", () => {
-  latestQrData = null; // Clear QR code after successful connection
-  console.log(
-    "✅ WhatsApp Engine is Connected & Listening for Dashboard Commands!",
-  );
-});
+mongoose
+  .connect(MONGO_URI)
+  .then(() => {
+    console.log("🍃 Successfully connected to MongoDB Session Store!");
 
-// Endpoint to easily render the QR code in your browser at /qr
-app.get("/qr", (req, res) => {
-  if (!latestQrData) {
-    return res.send(
-      "<h2>✅ WhatsApp is already connected or QR code is generating... check logs!</h2>",
-    );
-  }
-  const qrImage = require("qr-image");
-  const qrStream = qrImage.image(latestQrData, { type: "png" });
-  res.type("png");
-  qrStream.pipe(res);
-});
+    const store = new MongoStore({ mongoose: mongoose });
 
-// Default Configuration State
-let config = {
-  time: "09:00",
-  template: `⚔️ *AIESEC Daily Focus List*\nHi {NAME}! Here are your priorities for today:\n\n{TASKS}\n\n*Make it happen!*`,
-  team: [
-    {
-      name: "Layan",
-      phone: "97333000000",
-      tasks: [
-        "Noor Naser - Fill Info Session Comment",
-        "Raghad Aldossary - Follow-up Application",
-      ],
-    },
-    {
-      name: "Ali",
-      phone: "97333111111",
-      tasks: ["Ali Hammad - Pending Call"],
-    },
-  ],
-};
+    const client = new Client({
+      authStrategy: new RemoteAuth({
+        store: store,
+        backupSyncIntervalMs: 300000, // Saves session backup every 5 minutes
+      }),
+      puppeteer: {
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--single-process",
+          "--disable-gpu",
+        ],
+      },
+    });
 
-// Core Sending Function
-// Core Sending Function
-async function executeDispatch() {
-  console.log("🚀 Starting WhatsApp Focus Dispatch...");
+    client.on("qr", (qr) => {
+      latestQrData = qr;
+      console.log("⚡ New QR Code generated! View and scan it at /qr");
+    });
 
-  // Check if client is actually connected
-  if (!client.info || !client.info.wid) {
-    console.error("❌ Cannot send message: WhatsApp engine is not logged in or ready yet! Please scan the QR code first.");
-    return;
-  }
+    client.on("authenticated", () => {
+      console.log("🔐 WhatsApp Session Authenticated Successfully!");
+    });
 
-  for (const member of config.team) {
-    try {
-      let taskList = member.tasks
-        .map((task, i) => `${i + 1}. 🔸 ${task}`)
-        .join("\n");
+    client.on("ready", () => {
+      latestQrData = null;
+      console.log(
+        "✅ WhatsApp Engine is Fully Connected & Listening for Commands!",
+      );
+    });
 
-      let message = config.template
-        .replace("{NAME}", member.name)
-        .replace("{TASKS}", taskList);
+    client.on("remote_session_saved", () => {
+      console.log("💾 Persistent Session Saved to MongoDB Database!");
+    });
 
-      // Clean phone number
-      let cleanPhone = member.phone.replace(/[^0-9]/g, "");
-      if (cleanPhone.startsWith("00")) {
-        cleanPhone = cleanPhone.substring(2);
+    // Root status route
+    app.get("/", (req, res) => {
+      res.send(
+        '<h2>🤖 AIESEC WhatsApp Bot is running live!</h2><p>Go to <a href="/qr">/qr</a> to scan your WhatsApp QR code.</p>',
+      );
+    });
+
+    // Endpoint to display QR code image in browser
+    app.get("/qr", (req, res) => {
+      if (!latestQrData) {
+        return res.send(
+          "<h2>✅ WhatsApp is already connected or QR code is generating... check Render logs!</h2>",
+        );
+      }
+      const qrImage = require("qr-image");
+      const qrStream = qrImage.image(latestQrData, { type: "png" });
+      res.type("png");
+      qrStream.pipe(res);
+    });
+
+    // Default Configuration State
+    let config = {
+      time: "09:00",
+      template: `⚔️ *AIESEC Daily Focus List*\nHi {NAME}! Here are your priorities for today:\n\n{TASKS}\n\n*Make it happen!*`,
+      team: [],
+    };
+
+    // Core Dispatch Function
+    async function executeDispatch() {
+      console.log("🚀 Starting WhatsApp Focus Dispatch...");
+
+      if (!client.info || !client.info.wid) {
+        console.error(
+          "❌ Cannot send message: WhatsApp engine is not logged in or ready yet! Please scan the QR code first.",
+        );
+        return;
       }
 
-      let recipientId = cleanPhone + "@c.us";
+      for (const member of config.team) {
+        try {
+          let taskList = member.tasks
+            .map((task, i) => `${i + 1}. 🔸 ${task}`)
+            .join("\n");
 
-      // Verify number existence on WhatsApp
-      const isRegistered = await client.isRegisteredUser(recipientId);
-      if (!isRegistered) {
-        console.error(`❌ Number ${cleanPhone} is not registered on WhatsApp! Check country code.`);
-        continue;
+          let message = config.template
+            .replace("{NAME}", member.name)
+            .replace("{TASKS}", taskList);
+
+          let cleanPhone = member.phone.replace(/[^0-9]/g, "");
+          if (cleanPhone.startsWith("00")) {
+            cleanPhone = cleanPhone.substring(2);
+          }
+
+          let recipientId = cleanPhone + "@c.us";
+
+          await client.sendMessage(recipientId, message);
+          console.log(`✅ Sent focus list to ${member.name} (${cleanPhone})`);
+        } catch (err) {
+          console.error(
+            `❌ Failed to send to ${member.name}:`,
+            err.message || err,
+          );
+        }
       }
-
-      // Send message safely
-      await client.sendMessage(recipientId, message);
-      console.log(`✅ Sent focus list to ${member.name} (${cleanPhone})`);
-    } catch (err) {
-      console.error(`❌ Failed to send to ${member.name}:`, err.message);
     }
-  }
-}
 
-// API Endpoint: Manual Trigger From Admin Button
-app.post("/api/send-now", (req, res) => {
-  const { template, team } = req.body;
-  if (template) config.template = template;
-  if (team && team.length > 0) config.team = team;
+    // Manual Send Endpoint
+    app.post("/api/send-now", (req, res) => {
+      const { template, team } = req.body;
+      if (template) config.template = template;
+      if (team && team.length > 0) config.team = team;
 
-  executeDispatch();
-  res.json({ status: "success", message: "Dispatch initiated!" });
-});
+      executeDispatch();
+      res.json({ status: "success", message: "Dispatch initiated!" });
+    });
 
-// API Endpoint: Save Time & Cron Schedule
-let currentCronTask = null;
+    // Save Schedule Endpoint
+    let currentCronTask = null;
 
-app.post("/api/save-config", (req, res) => {
-  const { time, template, team } = req.body;
-  if (time) config.time = time;
-  if (template) config.template = template;
-  if (team && team.length > 0) config.team = team;
+    app.post("/api/save-config", (req, res) => {
+      const { time, template, team } = req.body;
+      if (time) config.time = time;
+      if (template) config.template = template;
+      if (team && team.length > 0) config.team = team;
 
-  // Destroy existing scheduled trigger if present
-  if (currentCronTask) {
-    currentCronTask.stop();
-  }
+      if (currentCronTask) {
+        currentCronTask.stop();
+      }
 
-  // Schedule new daily Cron trigger
-  const [hour, minute] = config.time.split(":");
-  currentCronTask = cron.schedule(`${minute} ${hour} * * *`, () => {
-    console.log(`⏰ Scheduled Daily Cron Executing at ${config.time}...`);
-    executeDispatch();
+      const [hour, minute] = config.time.split(":");
+      currentCronTask = cron.schedule(`${minute} ${hour} * * *`, () => {
+        console.log(`⏰ Executing Scheduled Daily Dispatch at ${config.time}...`);
+        executeDispatch();
+      });
+
+      console.log(`⏰ Updated Daily Schedule to ${config.time}`);
+      res.json({ status: "success", message: "Schedule updated successfully!" });
+    });
+
+    client.initialize();
+  })
+  .catch((err) => {
+    console.error("❌ Failed to connect to MongoDB Atlas:", err.message);
   });
 
-  console.log(`⏰ Updated Daily Schedule to ${config.time}`);
-  res.json({ status: "success", message: "Schedule updated successfully!" });
-});
-
-client.initialize();
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`🖥️ Server listening on port ${PORT}`),
-);
+app.listen(PORT, () => console.log(`🖥️ Server listening on port ${PORT}`));

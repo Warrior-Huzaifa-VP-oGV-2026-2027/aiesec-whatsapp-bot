@@ -27,7 +27,6 @@ async function connectToWhatsApp() {
   const useMultiFileAuthState = baileys.useMultiFileAuthState;
   const DisconnectReason = baileys.DisconnectReason;
 
-  // Silent logger to prevent log spam & timeouts on history sync
   const pino = require("pino");
   const logger = pino({ level: "silent" });
 
@@ -37,10 +36,10 @@ async function connectToWhatsApp() {
 
   sock = makeWASocket({
     auth: state,
-    logger: logger,               // Mutes raw Baileys debug spam
+    logger: logger,
     printQRInTerminal: false,
-    syncFullHistory: false,      // FIX: Don't download old chat history
-    downloadHistory: false,      // FIX: Prevents "Timed Out" on history queries
+    syncFullHistory: false,
+    downloadHistory: false,
     markOnlineOnConnect: false
   });
 
@@ -104,9 +103,9 @@ let config = {
   team: []
 };
 
-// Dispatch logic
+// Core Dispatch function
 async function executeDispatch() {
-  console.log("🚀 Starting WhatsApp Focus Dispatch...");
+  console.log("🚀 Starting Scheduled WhatsApp Focus Dispatch...");
 
   if (!sock || !isConnected) {
     console.error("❌ Cannot send: Baileys WhatsApp client is not connected yet!");
@@ -131,7 +130,7 @@ async function executeDispatch() {
   }
 }
 
-// API Endpoints
+// Manual Instant Send Endpoint
 app.post("/api/send-now", (req, res) => {
   const { template, team } = req.body;
   if (template) config.template = template;
@@ -141,6 +140,7 @@ app.post("/api/send-now", (req, res) => {
   res.json({ status: "success", message: "Dispatch initiated!" });
 });
 
+// Save Schedule Endpoint with explicit Timezone support
 let currentCronTask = null;
 app.post("/api/save-config", (req, res) => {
   const { time, template, team } = req.body;
@@ -151,13 +151,23 @@ app.post("/api/save-config", (req, res) => {
   if (currentCronTask) currentCronTask.stop();
 
   const [hour, minute] = config.time.split(":");
-  currentCronTask = cron.schedule(`${minute} ${hour} * * *`, () => {
-    console.log(`⏰ Executing Scheduled Dispatch at ${config.time}...`);
-    executeDispatch();
-  });
+  const cronExpression = `${parseInt(minute)} ${parseInt(hour)} * * *`;
 
-  console.log(`⏰ Daily Schedule set to ${config.time}`);
-  res.json({ status: "success", message: "Schedule updated!" });
+  // CHANGE 'Asia/Bahrain' below if you are in a different time zone!
+  currentCronTask = cron.schedule(
+    cronExpression,
+    () => {
+      console.log(`⏰ Executing Scheduled Dispatch at ${config.time}...`);
+      executeDispatch();
+    },
+    {
+      scheduled: true,
+      timezone: "Asia/Bahrain" // Ensures times set in dashboard match your local clock!
+    }
+  );
+
+  console.log(`⏰ Daily Schedule set to ${config.time} (Asia/Bahrain timezone)`);
+  res.json({ status: "success", message: "Schedule updated with timezone alignment!" });
 });
 
 const PORT = process.env.PORT || 3000;

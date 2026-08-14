@@ -1,9 +1,3 @@
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion
-} = require("@whiskeysockets/baileys");
 const express = require("express");
 const cron = require("node-cron");
 const qrImage = require("qr-image");
@@ -27,6 +21,15 @@ app.use(express.json());
 const AUTH_DIR = path.join(__dirname, "baileys_auth_info");
 
 async function connectToWhatsApp() {
+  // Dynamic import to support ESM package in CommonJS
+  const baileys = await import("@whiskeysockets/baileys");
+  const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason,
+    fetchLatestBaileysVersion
+  } = baileys;
+
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
 
@@ -60,7 +63,7 @@ async function connectToWhatsApp() {
       isConnected = false;
       const shouldReconnect =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      
+
       console.log(
         "⚠️ Connection closed due to:",
         lastDisconnect?.error || "Unknown Reason",

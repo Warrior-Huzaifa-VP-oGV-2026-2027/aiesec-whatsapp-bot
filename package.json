@@ -1,0 +1,14 @@
+{
+  "name": "aiesec-whatsapp-bot",
+  "version": "1.0.0",
+  "main": "send_focus.js",
+  "scripts": {
+    "start": "node send_focus.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.23.0"
+  }
+}

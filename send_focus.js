@@ -19,12 +19,19 @@ app.use(express.json());
 
 // Initialize WhatsApp Web Client using local macOS Chrome
 const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: {
-    executablePath:
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  },
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ]
+    }
 });
 
 client.on("qr", (qr) => {

@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIESEC Global Volunteer Contract Generator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- JSZip & FileSaver -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen py-10 px-4">
+
+  <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+    <!-- Header Banner -->
+    <div class="bg-gradient-to-r from-blue-700 to-indigo-800 p-8 text-white">
+      <div class="flex items-center space-x-3 mb-2">
+        <span class="bg-blue-500/30 text-blue-100 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">AIESEC in Bahrain</span>
+      </div>
+      <h1 class="text-3xl font-bold">Global Volunteer Contract Generation Form</h1>
+      <p class="text-blue-100 text-sm mt-2 max-w-2xl">
+        Upload your Word contract template, select an EP from the registered responses to auto-fill their data, and fill in any remaining details.
+      </p>
+    </div>
+
+    <!-- Form Container -->
+    <form id="contractForm" class="p-8 space-y-10">
+
+      <!-- SECTION 0: Controls -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Document Template Upload -->
+        <div class="bg-blue-50 p-6 rounded-xl border border-blue-200">
+          <h2 class="text-base font-bold text-blue-900 mb-2 flex items-center">
+            <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+            1. Select Word Template (.docx)
+          </h2>
+          <p class="text-xs text-blue-700 mb-3">Upload your contract template Word document.</p>
+          <input type="file" id="docPicker" accept=".docx" required
+            class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"/>
+        </div>
+
+        <!-- Google Sheet EP Import Button -->
+        <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-200 flex flex-col justify-between">
+          <div>
+            <h2 class="text-base font-bold text-indigo-900 mb-2 flex items-center">
+              <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              2. Import EP Data
+            </h2>
+            <p class="text-xs text-indigo-700 mb-4">Click to open the EP response list and auto-fill details directly into the form.</p>
+          </div>
+          <button type="button" id="fetchSheetBtn" onclick="fetchSheetData()"
+            class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow transition duration-150 flex items-center justify-center space-x-2 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            <span>Select EP from Responses Sheet</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- SECTION 1: Personal & Identification -->
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 border-b pb-2 mb-6 flex items-center">
+          <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">1</span>
+          Exchange Participant Information
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Full Four-Part Name *</label>
+            <input type="text" id="fullName" required placeholder="e.g. John Doe Smith" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Gender *</label>
+            <select id="gender" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="">Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Date of Birth *</label>
+            <input type="text" id="dob" required placeholder="e.g. YYYY-MM-DD or MM/DD/YYYY" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Age *</label>
+            <input type="number" id="age" required placeholder="e.g. 21" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Nationality *</label>
+            <input type="text" id="nationality" required placeholder="e.g. Bahraini" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">National ID / CPR *</label>
+            <input type="text" id="nationalId" required placeholder="e.g. XXXXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Passport Number *</label>
+            <input type="text" id="passportNum" required placeholder="e.g. XXXXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Passport Expiry Date *</label>
+            <input type="text" id="passportExpiry" placeholder="e.g. YYYY-MM-DD" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: Contact Information -->
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 border-b pb-2 mb-6 flex items-center">
+          <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">2</span>
+          Contact & Address Information
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Email Address *</label>
+            <input type="email" id="email" required placeholder="e.g. example@gmail.com" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Primary Contact Number *</label>
+            <input type="tel" id="primaryContact" required placeholder="+973 XXXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Secondary Contact Number</label>
+            <input type="tel" id="secondaryContact" placeholder="+973 XXXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Telegram Username</label>
+            <input type="text" id="telegram" placeholder="@username" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">Primary Home Address *</label>
+            <input type="text" id="primaryAddress" required placeholder="Flat XX, Building XX, Road XX, Block XX, City" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: Parent / Guardian Info -->
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 border-b pb-2 mb-6 flex items-center">
+          <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">3</span>
+          Parent / Guardian Information
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Parent/Guardian Full Name *</label>
+            <input type="text" id="guardianName" required placeholder="e.g. Guardian Name" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Relationship *</label>
+            <input type="text" id="guardianRelation" required placeholder="e.g. Father / Mother" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Guardian Primary Contact *</label>
+            <input type="tel" id="guardianPrimaryContact" required placeholder="+973 XXXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Guardian Secondary Contact</label>
+            <input type="tel" id="guardianSecondaryContact" placeholder="+973 XXXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 4: Opportunity Details -->
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 border-b pb-2 mb-6 flex items-center">
+          <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">4</span>
+          Opportunity Details
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">EP ID *</label>
+            <input type="text" id="epId" required placeholder="e.g. XXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">OP ID *</label>
+            <input type="text" id="opId" required placeholder="e.g. XXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Destination Country *</label>
+            <input type="text" id="destCountry" required placeholder="e.g. Country Name" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Destination City *</label>
+            <input type="text" id="destCity" required placeholder="e.g. City Name" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">NGO Name *</label>
+            <input type="text" id="ngoName" required placeholder="e.g. Hope Foundation" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Project Address *</label>
+            <input type="text" id="projectAddress" required placeholder="e.g. Street 12, Sector 4, City" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Duration *</label>
+            <input type="text" id="duration" required placeholder="e.g. 6 Weeks" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Physical Period *</label>
+            <input type="text" id="physicalPeriod" required placeholder="e.g. DD/MM/YYYY to DD/MM/YYYY" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Project Period *</label>
+            <input type="text" id="projectPeriod" required placeholder="e.g. 1st day of the week to last day of the week" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Day Offs *</label>
+            <input type="text" id="dayOffs" required placeholder="e.g. Weekends" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Working Hours *</label>
+            <input type="text" id="workingHours" required placeholder="e.g. 09:00 to 17:00; pause from 13:00 to 14:00" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Weekly Workload *</label>
+            <input type="text" id="weeklyWorkload" required placeholder="e.g. 25h (twenty-five hours)" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Compensation *</label>
+            <input type="text" id="compensation" required placeholder="e.g. $0.00 (Zero) monthly" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Food Provided *</label>
+            <select id="foodProvided" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Food on Work Days *</label>
+            <input type="text" id="foodWorkDays" required placeholder="e.g. 1 (one) per day" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Accommodation Provided *</label>
+            <select id="accommodationProvided" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Accommodation Covered *</label>
+            <select id="accommodationCovered" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Transport Provided *</label>
+            <select id="transportProvided" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Transport Covered *</label>
+            <select id="transportCovered" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Computer Provided *</label>
+            <select id="computerProvided" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+              <option value="Yes">Yes</option>
+              <option value="No" selected>No</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Project Fee to be Paid at Destination *</label>
+            <input type="text" id="projectFee" required placeholder="e.g. $50 USD" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">Role Description *</label>
+            <textarea id="roleDescription" required rows="3" placeholder="Briefly describe the role..." class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">Role Responsibilities *</label>
+            <textarea id="roleResponsibilities" required rows="3" placeholder="List key responsibilities..." class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 5: Travel Details -->
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 border-b pb-2 mb-6 flex items-center">
+          <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">5</span>
+          Travel Details
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Intended Departure Date *</label>
+            <input type="text" id="departureDate" required placeholder="e.g. YYYY-MM-DD" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Intended Return Date *</label>
+            <input type="text" id="returnDate" required placeholder="e.g. YYYY-MM-DD" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 6: Local Committee & VP oGV Details -->
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 border-b pb-2 mb-6 flex items-center">
+          <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">6</span>
+          Local Committee & VP oGV Details
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">Home Local Committee (LC) *</label>
+            <input type="text" id="localCommittee" required value="LC Tylos" placeholder="e.g. LC Tylos" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">VP Name *</label>
+            <input type="text" id="vpName" required value="Huzaifa Suhail" placeholder="Huzaifa Suhail" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">VP Mobile Number *</label>
+            <input type="tel" id="vpMobile" required value="33500979" placeholder="33500979" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">VP Email Address *</label>
+            <input type="email" id="vpEmail" required value="huzaifa.suhail@aiesec.net" placeholder="huzaifa.suhail@aiesec.net" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 7: EP Manager Details -->
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 border-b pb-2 mb-6 flex items-center">
+          <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">7</span>
+          EP Manager Details
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">EP Manager Name *</label>
+            <input type="text" id="epManagerName" required placeholder="e.g. Sarah Jenkins" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">EP Manager Phone Number *</label>
+            <input type="tel" id="epManagerPhone" required placeholder="+973 XXXXXXXX" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">EP Manager Email *</label>
+            <input type="email" id="epManagerEmail" required placeholder="e.g. example@aiesec.net" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 8: AIESEC Host Entity Information -->
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 border-b pb-2 mb-6 flex items-center">
+          <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">8</span>
+          AIESEC Host Entity Information
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Host Local Committee (LC) *</label>
+            <input type="text" id="hostLC" required placeholder="e.g. AIESEC in Host City" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Host Member Committee (MC) *</label>
+            <input type="text" id="hostMC" required placeholder="e.g. AIESEC in Host Country" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Host LCVP for ICX Name *</label>
+            <input type="text" id="hostLCVPName" required placeholder="e.g. Alex Johnson" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Host LCVP Email *</label>
+            <input type="email" id="hostLCVPEmail" required placeholder="e.g. example@aiesec.net" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Name of MCVP for ICX *</label>
+            <input type="text" id="mcvpICXName" required placeholder="e.g. Maria Garcia" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Email of MCVP for ICX *</label>
+            <input type="email" id="mcvpICXEmail" required placeholder="e.g. example@aiesec.net" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- Consent Checkbox -->
+      <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start space-x-3">
+        <input type="checkbox" id="consent" required class="mt-1 h-5 w-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+        <label for="consent" class="text-sm text-slate-700 leading-relaxed">
+          I agree to share the provided information with <strong>AIESEC in Bahrain</strong> to be used for contract generation and program administration.
+        </label>
+      </div>
+
+      <!-- Action Button -->
+      <div class="pt-4 flex flex-col items-center">
+        <button type="submit" id="generateBtn" class="w-full md:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 2 2 01-2-2V5a2 2 2 2 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 2 2 01-2 2z"></path></svg>
+          <span>Generate & Download Contract (.docx)</span>
+        </button>
+        <p id="statusMsg" class="text-xs text-center mt-3 font-medium text-slate-500"></p>
+      </div>
+
+    </form>
+
+    <!-- Footer Credit -->
+    <div class="pb-6 text-center border-t border-slate-100 pt-4 bg-slate-50/50">
+      <p class="text-xs text-slate-400 font-medium">Powered By Huzaifa</p>
+    </div>
+  </div>
+
+  <!-- MODAL: EP Selection List -->
+  <div id="epModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div>
+          <h3 class="font-bold text-slate-800 text-lg">Select Exchange Participant</h3>
+          <p class="text-xs text-slate-500">Click on an EP name to populate the contract form.</p>
+        </div>
+        <button type="button" onclick="closeEpModal()" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div id="epListContainer" class="p-4 overflow-y-auto space-y-2 flex-1 divide-y divide-slate-100">
+        <!-- Dynamic EP list options render here -->
+      </div>
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-3">
+        <button type="button" onclick="closeEpModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxBgAl-HNZEU1JJVFIXpKiA_iCrYdycud6gOkwqq0xXWm8pJ0XCUTaMLhr8dWyfP0Z5/exec";
+
+    let sheetParsedData = [];
+
+    function escapeXml(unsafe) {
+      if (!unsafe) return "";
+      return unsafe.toString().replace(/[<>&'"]/g, function (c) {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
+          default: return c;
+        }
+      });
+    }
+
+    // Formats ISO string dates (e.g., 2004-02-19T21:00:00.000Z) to cleaner format (YYYY-MM-DD)
+    function formatDateString(str) {
+      if (!str) return '';
+      if (typeof str === 'string' && str.includes('T')) {
+        return str.split('T')[0];
+      }
+      return str;
+    }
+
+    async function fetchSheetData() {
+      const btn = document.getElementById('fetchSheetBtn');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `<svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Fetching EPs...`;
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, { redirect: 'follow' });
+        if (!res.ok) throw new Error("Server responded with error status: " + res.status);
+        
+        sheetParsedData = await res.json();
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+
+        if (!sheetParsedData || sheetParsedData.length === 0) {
+          alert("No records found in the Google Sheet.");
+          return;
+        }
+
+        openEpModal(sheetParsedData);
+
+      } catch (err) {
+        console.error("Fetch Error:", err);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        alert("Could not fetch EP data. Make sure your Google Apps Script deployment permissions allow access.");
+      }
+    }
+
+    function openEpModal(data) {
+      const container = document.getElementById('epListContainer');
+      container.innerHTML = '';
+
+      data.forEach((row, index) => {
+        const name = row['Full Four-Part Name'] || row['Full Name'] || row['Name'] || `EP #${index + 1}`;
+        const email = row['Email Address'] || row['Email'] || '';
+        
+        if (name.toString().trim()) {
+          const item = document.createElement('div');
+          item.className = "flex items-center justify-between p-3 hover:bg-indigo-50 rounded-xl cursor-pointer transition-colors";
+          item.onclick = () => selectEp(index);
+          item.innerHTML = `
+            <div>
+              <p class="font-semibold text-slate-800 text-sm">${escapeXml(name)}</p>
+              <p class="text-xs text-slate-400">${escapeXml(email)}</p>
+            </div>
+            <span class="text-xs text-indigo-600 font-medium hover:underline">Select &rarr;</span>
+          `;
+          container.appendChild(item);
+        }
+      });
+
+      document.getElementById('epModal').classList.remove('hidden');
+      document.getElementById('epModal').classList.add('flex');
+    }
+
+    function closeEpModal() {
+      document.getElementById('epModal').classList.add('hidden');
+      document.getElementById('epModal').classList.remove('flex');
+    }
+
+    function selectEp(index) {
+      const ep = sheetParsedData[index];
+      if (!ep) return;
+
+      const getVal = (...keys) => {
+        for (let k of keys) {
+          if (ep[k] !== undefined && ep[k] !== null && ep[k] !== "") {
+            return ep[k].toString().trim();
+          }
+        }
+        return "";
+      };
+
+      // Personal Information
+      document.getElementById('fullName').value = getVal('Full Four-Part Name', 'Full Name', 'Name');
+      document.getElementById('primaryContact').value = getVal('Primary Contact Number', 'Contact Number', 'Phone');
+      document.getElementById('secondaryContact').value = getVal('Secondary Contact Number', 'Secondary Contact');
+      document.getElementById('email').value = getVal('Email Address', 'Email');
+      document.getElementById('age').value = getVal('Age');
+      document.getElementById('dob').value = formatDateString(getVal('Date of Birth', 'DOB'));
+      document.getElementById('nationality').value = getVal('Nationality');
+      
+      // Passport & CPR
+      document.getElementById('nationalId').value = getVal('National ID', 'CPR', 'National ID / CPR');
+      document.getElementById('passportNum').value = getVal('Passport Number', 'Passport Number / CPR', 'Passport');
+      document.getElementById('passportExpiry').value = formatDateString(getVal('Passport Expiry Date', 'Passport Expiry'));
+
+      // Address
+      document.getElementById('primaryAddress').value = getVal(
+        'Primary Home Address / Street, Block, Road, Building, Flat or Villa',
+        'Primary Home Address',
+        'Address'
+      );
+
+      // Guardian Information (Includes typo key 'Realationship' as well as standard 'Relationship')
+      document.getElementById('guardianName').value = getVal('Parent/Guardian Full Name', 'Guardian Name');
+      document.getElementById('guardianRelation').value = getVal('Realationship', 'Relationship', 'Guardian Relation');
+      document.getElementById('guardianPrimaryContact').value = getVal("Guardian's Primary Contact Number", 'Guardian Primary Contact');
+      document.getElementById('guardianSecondaryContact').value = getVal("Guardian's Secondary Contact Number", 'Guardian Secondary Contact');
+
+      // Travel dates
+      document.getElementById('departureDate').value = formatDateString(getVal('Intended Departure Date', 'Departure Date'));
+      document.getElementById('returnDate').value = formatDateString(getVal('Intended Return Date', 'Return Date'));
+
+      closeEpModal();
+    }
+
+    document.getElementById('contractForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const docPicker = document.getElementById('docPicker');
+      const statusMsg = document.getElementById('statusMsg');
+      const btn = document.getElementById('generateBtn');
+
+      if (!docPicker.files[0]) {
+        alert("Please select your Word template file (.docx) first!");
+        return;
+      }
+
+      statusMsg.innerText = "Processing document safely...";
+      statusMsg.className = "text-xs text-center mt-3 font-medium text-slate-500";
+      btn.disabled = true;
+
+      try {
+        const file = docPicker.files[0];
+        const zip = await JSZip.loadAsync(file);
+
+        const fullName = document.getElementById('fullName').value.trim();
+        const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const primaryAddress = document.getElementById('primaryAddress').value.trim();
+        
+        const vpName = document.getElementById('vpName').value.trim();
+        const vpMobile = document.getElementById('vpMobile').value.trim();
+        const vpEmail = document.getElementById('vpEmail').value.trim();
+
+        const epManagerName = document.getElementById('epManagerName').value.trim();
+        const epManagerPhone = document.getElementById('epManagerPhone').value.trim();
+        const epManagerEmail = document.getElementById('epManagerEmail').value.trim();
+
+        const hostLCVPName = document.getElementById('hostLCVPName').value.trim();
+        const hostLCVPEmail = document.getElementById('hostLCVPEmail').value.trim();
+
+        const hostLC = document.getElementById('hostLC').value.trim();
+        const hostMC = document.getElementById('hostMC').value.trim();
+        const mcvpName = document.getElementById('mcvpICXName').value.trim();
+        const mcvpEmail = document.getElementById('mcvpICXEmail').value.trim();
+        const projectFee = document.getElementById('projectFee').value.trim();
+        const foodWorkDays = document.getElementById('foodWorkDays').value.trim();
+
+        const replacements = {
+          "EP_Name": fullName,
+          "Name": fullName,
+          "Date": currentDate,
+          "Address": primaryAddress,
+          "insert address": primaryAddress,
+          "Gender": document.getElementById('gender').value,
+          "Age": document.getElementById('age').value,
+          "DOB": document.getElementById('dob').value,
+          "Nationality": document.getElementById('nationality').value,
+          "CPR": document.getElementById('nationalId').value,
+          "National ID": document.getElementById('nationalId').value,
+          "Passport": document.getElementById('passportNum').value,
+          "Passport Expiry": document.getElementById('passportExpiry').value,
+          "Email": document.getElementById('email').value.trim(),
+          "Phone": document.getElementById('primaryContact').value.trim(),
+          "Contact": document.getElementById('primaryContact').value.trim(),
+          "Secondary Contact": document.getElementById('secondaryContact').value.trim() || 'N/A',
+          "Telegram": document.getElementById('telegram').value.trim() || 'N/A',
+
+          "Guardian Name": document.getElementById('guardianName').value.trim(),
+          "Guardian Relation": document.getElementById('guardianRelation').value.trim(),
+          "Guardian Contact": document.getElementById('guardianPrimaryContact').value.trim(),
+
+          "EP ID": document.getElementById('epId').value.trim(),
+          "OP ID": document.getElementById('opId').value.trim(),
+          "Destination Country": document.getElementById('destCountry').value.trim(),
+          "Destiny Country": document.getElementById('destCountry').value.trim(),
+          "Destination City": document.getElementById('destCity').value.trim(),
+          "Destiny City": document.getElementById('destCity').value.trim(),
+          "NGO Name": document.getElementById('ngoName').value.trim(),
+          "Project Address": document.getElementById('projectAddress').value.trim(),
+          "Duration": document.getElementById('duration').value.trim(),
+          "Physical Period": document.getElementById('physicalPeriod').value.trim(),
+          "Project Period": document.getElementById('projectPeriod').value.trim(),
+          "Day offs": document.getElementById('dayOffs').value.trim(),
+          "Working Hours": document.getElementById('workingHours').value.trim(),
+          "Weekly Workload": document.getElementById('weeklyWorkload').value.trim(),
+          "Compensation": document.getElementById('compensation').value.trim(),
+          "Food Provided": document.getElementById('foodProvided').value,
+          "Food Work days on": foodWorkDays,
+          "Food on Work days": foodWorkDays,
+
+          "Accommodation Provided": document.getElementById('accommodationProvided').value,
+          "Accommodation Covered": document.getElementById('accommodationCovered').value,
+          "Transport Provided": document.getElementById('transportProvided').value,
+          "Transport Covered": document.getElementById('transportCovered').value,
+          "Computer Provided": document.getElementById('computerProvided').value,
+
+          "Project Fee at be destination paid to": projectFee,
+          "Project Fee to be paid at destination": projectFee,
+
+          "Role Description": document.getElementById('roleDescription').value.trim(),
+          "Role Responsibilities": document.getElementById('roleResponsibilities').value.trim(),
+
+          "Departure Date": document.getElementById('departureDate').value,
+          "Return Date": document.getElementById('returnDate').value,
+
+          "Local Committee": document.getElementById('localCommittee').value.trim(),
+          "VP Name": vpName,
+          "VP Mobile": vpMobile,
+          "VP Email": vpEmail,
+
+          "EP Manager Name": epManagerName,
+          "EP Manager Phone": epManagerPhone,
+          "EP Manager Email": epManagerEmail,
+          "EP Email Manager": epManagerEmail,
+          "EP Manager": `${epManagerName}, ${epManagerEmail}`,
+
+          "Host Committee Local": hostLC,
+          "Host Local Committee": hostLC,
+          "Host Committee Member": hostMC,
+          "Host Member Committee": hostMC,
+
+          "Host LCVP": hostLCVPName,
+          "Host Email LCVP": hostLCVPEmail,
+          "Host LCVP Email": hostLCVPEmail,
+          "Email ICX LCVP for of": hostLCVPEmail,
+          "Email of LCVP for ICX": hostLCVPEmail,
+
+          "MCVP ICX Name": mcvpName,
+          "MCVP Email ICX": mcvpEmail,
+          "MCVP ICX Email": mcvpEmail,
+          "Email ICX MCVP for of": mcvpEmail,
+          "Email of MCVP for ICX": mcvpEmail,
+
+          "Contact country destination for": `${hostLCVPName}, ${hostLCVPEmail}`,
+          "Contact for country destination": `${hostLCVPName}, ${hostLCVPEmail}`
+        };
+
+        const xmlFiles = Object.keys(zip.files).filter(fileName => 
+          fileName.startsWith("word/document") || 
+          fileName.startsWith("word/header") || 
+          fileName.startsWith("word/footer")
+        );
+
+        for (let fileName of xmlFiles) {
+          let xmlText = await zip.file(fileName).async("string");
+
+          for (const [key, rawValue] of Object.entries(replacements)) {
+            const safeValue = escapeXml(rawValue);
+
+            const keyChars = key.split('').map(c => {
+              if (/\s/.test(c)) return '\\s+';
+              return c.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            }).join('(?:<[^>]+>)*');
+
+            const pattern = new RegExp(`(?:&lt;|<){1,2}\\s*(?:<[^>]+>)*${keyChars}(?:<[^>]+>)*\\s*(?:&gt;|>){1,2}`, 'gi');
+            
+            xmlText = xmlText.replace(pattern, safeValue);
+          }
+
+          zip.file(fileName, xmlText);
+        }
+
+        const blob = await zip.generateAsync({ 
+          type: "blob",
+          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        });
+
+        const safeFileName = fullName ? fullName.replace(/\s+/g, '_') : 'Generated';
+        saveAs(blob, `Contract_${safeFileName}.docx`);
+
+        statusMsg.innerText = "✅ Generated and downloaded successfully!";
+        statusMsg.className = "text-xs text-center mt-3 font-medium text-green-600";
+      } catch (err) {
+        console.error("Error generating contract:", err);
+        statusMsg.innerText = "❌ Failed to generate document. Check console.";
+        statusMsg.className = "text-xs text-center mt-3 font-medium text-red-600";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
